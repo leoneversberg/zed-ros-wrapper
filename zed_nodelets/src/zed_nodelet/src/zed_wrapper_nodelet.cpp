@@ -708,7 +708,6 @@ void ZEDWrapperNodelet::readParameters() {
 
     // ----> Object Detection
     mNhNs.param<bool>("object_detection/od_enabled", mObjDetEnabled, false);
-
     if (mObjDetEnabled) {
         NODELET_INFO_STREAM(" * Object Detection\t\t-> ENABLED");
         mNhNs.getParam("object_detection/confidence_threshold", mObjDetConfidence);
@@ -1340,6 +1339,11 @@ bool ZEDWrapperNodelet::start_obj_detect() {
     //od_p.image_sync = true;
     od_p.image_sync = false; // Asynchronous object detection
 
+    //DI7 NEW
+    //od_p.detection_model = sl::DETECTION_MODEL::HUMAN_BODY_FAST; //Keypoints based, specific to human skeleton, real time performance even on Jetson or low end GPU cards
+    od_p.detection_model = sl::DETECTION_MODEL::HUMAN_BODY_ACCURATE; //Keypoints based, specific to human skeleton, state of the art accuracy, requires powerful GPU
+
+    //
     sl::ERROR_CODE objDetError = mZed.enableObjectDetection(od_p);
 
     if (objDetError != sl::ERROR_CODE::SUCCESS) {
@@ -4176,6 +4180,65 @@ void ZEDWrapperNodelet::detectObjects(bool publishObj, bool publishViz, ros::Tim
             bbx_marker.frame_locked = true;
 
             objMarkersMsg.markers.push_back(bbx_marker);
+
+            // NEW STUFF DI7
+            visualization_msgs::Marker keypoint_marker;
+            // https://www.stereolabs.com/docs/api/group__Object__group.html#gacce1373b1af32c33563d484bf326bc8e
+            //NOSE
+            //NECK
+            //RIGHT_SHOULDER
+            //RIGHT_ELBOW
+            //RIGHT_WRIST
+            //LEFT_SHOULDER
+            //LEFT_ELBOW
+            //LEFT_WRIST
+            //RIGHT_HIP
+            //RIGHT_KNEE
+            //RIGHT_ANKLE
+            //LEFT_HIP
+            //LEFT_KNEE
+            //LEFT_ANKLE
+            //RIGHT_EYE
+            //LEFT_EYE
+            //RIGHT_EAR
+            //LEFT_EAR
+            //NODELET_INFO_STREAM(" * Keypoint Size: " << data.keypoint.size());
+            for (size_t i = 0; i < data.keypoint.size(); i++) {
+              if (!(std::isfinite(data.keypoint[i].x) && std::isfinite(data.keypoint[i].y) && std::isfinite(data.keypoint[i].z))) {
+                // in some cases, eg. body partially out of the image or missing depth data, some keypoint can not be detected, they will have non finite values.
+                continue;
+              }
+
+            keypoint_marker.header = header;
+            keypoint_marker.ns = "keypoint";
+            keypoint_marker.id = i;
+            keypoint_marker.type = visualization_msgs::Marker::SPHERE;
+            keypoint_marker.action = visualization_msgs::Marker::ADD;
+            keypoint_marker.pose.position.x = data.keypoint[i].x;
+            keypoint_marker.pose.position.y = data.keypoint[i].y;
+            keypoint_marker.pose.position.z = data.keypoint[i].z;
+            keypoint_marker.pose.orientation.x = 0.0;
+            keypoint_marker.pose.orientation.y = 0.0;
+            keypoint_marker.pose.orientation.z = 0.0;
+            keypoint_marker.pose.orientation.w = 1.0;
+
+            keypoint_marker.scale.x = 0.02;
+            keypoint_marker.scale.y = 0.03;
+            keypoint_marker.scale.z = 0.03;
+            //sl::float3 color2 = generateColorClass(data.id);
+            keypoint_marker.color.b = 0.0;
+            keypoint_marker.color.g = 0.0;
+            keypoint_marker.color.r = 1.0;
+            keypoint_marker.color.a = 0.5;
+            keypoint_marker.lifetime = ros::Duration(0.3);
+            keypoint_marker.frame_locked = true;
+
+            objMarkersMsg.markers.push_back(keypoint_marker);
+            }
+            // END NEW STUFF
+
+
+
 
             visualization_msgs::Marker label;
             label.header = header;
